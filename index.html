@@ -3,659 +3,814 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Enigma Machine Simulator</title>
+    <title>Axelrod's Prisoner's Dilemma Tournament</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&family=Special+Elite&display=swap');
-
-        body {
-            background-color: #1a1a1a;
-            font-family: 'Courier Prime', monospace;
-            color: #d4d4d4;
-        }
-
-        .enigma-font {
-            font-family: 'Special Elite', cursive;
-        }
-
-        /* Lamp glow effect */
-        .lamp {
-            transition: all 0.1s ease;
-            box-shadow: inset 0 0 10px rgba(0,0,0,0.8);
-        }
-        .lamp.active {
-            background-color: #fbbf24;
-            color: #451a03;
-            box-shadow: 0 0 15px #fbbf24, inset 0 0 10px #fbbf24;
-            text-shadow: 0 0 5px white;
-            transform: scale(1.05);
-        }
-
-        /* Key press effect */
-        .key-btn:active {
-            transform: translateY(2px);
-            box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);
-        }
-
-        .wood-texture {
-            background-color: #3e2723;
-            background-image: repeating-linear-gradient(45deg, rgba(255,255,255,0.05) 25px, transparent 25px, transparent 50px, rgba(255,255,255,0.05) 50px, rgba(255,255,255,0.05) 75px, transparent 75px, transparent 100px);
-        }
+        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
+        .grid-cell { transition: all 0.1s; }
+        .strategy-label { font-size: 0.65rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         
-        .metal-texture {
-            background-color: #262626;
-            background-image: radial-gradient(circle at 50% 50%, rgba(255,255,255,0.1) 0%, transparent 60%);
+        /* Custom scrollbar for the timeline */
+        .timeline-scroll::-webkit-scrollbar { height: 8px; }
+        .timeline-scroll::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
+        .timeline-scroll::-webkit-scrollbar-thumb { background: #c7c7c7; border-radius: 4px; }
+        .timeline-scroll::-webkit-scrollbar-thumb:hover { background: #a0a0a0; }
+
+        .selected-cell {
+            border: 2px solid #6366f1 !important; /* Indigo-500 */
+            z-index: 10;
+            transform: scale(1.1);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
         }
 
-        /* Scrollbar for history */
-        ::-webkit-scrollbar {
-            width: 8px;
-        }
-        ::-webkit-scrollbar-track {
-            background: #262626; 
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #555; 
-            border-radius: 4px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #777; 
-        }
-
-        input[type="number"]::-webkit-inner-spin-button, 
-        input[type="number"]::-webkit-outer-spin-button { 
-            -webkit-appearance: none; 
-            margin: 0; 
-        }
+        /* Modal Animation */
+        .modal-enter { opacity: 0; transform: scale(0.95); }
+        .modal-enter-active { opacity: 1; transform: scale(1); transition: all 0.2s; }
+        .modal-exit { opacity: 1; transform: scale(1); }
+        .modal-exit-active { opacity: 0; transform: scale(0.95); transition: all 0.2s; }
     </style>
 </head>
-<body class="min-h-screen flex items-center justify-center p-4">
+<body class="p-4 md:p-8 relative">
 
-    <!-- Increased max-width to accommodate side panel -->
-    <div class="max-w-7xl w-full bg-neutral-800 rounded-xl shadow-2xl overflow-hidden border border-neutral-700 grid grid-cols-1 lg:grid-cols-3">
-        
-        <!-- Left Column: The Machine (Span 2) -->
-        <div class="lg:col-span-2 border-r border-neutral-700 flex flex-col">
-            <!-- Header -->
-            <div class="bg-neutral-900 p-4 border-b border-neutral-700 flex justify-between items-center">
-                <h1 class="text-2xl font-bold tracking-wider text-amber-500 enigma-font">ENIGMA I</h1>
-                <div class="text-xs text-neutral-500 font-mono hidden sm:block">Wehrmacht Enigma I (Reflector B)</div>
+    <div class="max-w-[1400px] mx-auto">
+        <!-- Header -->
+        <header class="mb-6 flex flex-col md:flex-row justify-between items-center bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-800">Axelrod's Tournament</h1>
+                <p class="text-gray-500 mt-1 text-sm">Select a grid cell for match details, or click a strategy name for logic info.</p>
+            </div>
+            <div class="flex items-center gap-3 mt-4 md:mt-0">
+                <div class="text-right mr-4 border-r pr-6 border-gray-200">
+                    <div class="text-xs text-gray-400 uppercase tracking-wider">Round</div>
+                    <div class="text-4xl font-mono font-bold text-indigo-600" id="round-display">0/200</div>
+                </div>
+                
+                <button onclick="stepGame()" class="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-lg font-medium transition flex items-center gap-2">
+                    <span>⏯</span> Step +1
+                </button>
+
+                <button onclick="togglePlay()" id="play-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg font-medium transition flex items-center gap-2 shadow-sm">
+                    <span id="play-icon">▶</span> Auto-Play
+                </button>
+
+                <button onclick="resetGame()" class="bg-gray-100 hover:bg-gray-200 text-gray-600 px-4 py-2 rounded-lg font-medium transition">
+                    Reset
+                </button>
+            </div>
+        </header>
+
+        <div class="grid grid-cols-1 xl:grid-cols-12 gap-6">
+            
+            <!-- Left Column: The 15x15 Grid -->
+            <div class="xl:col-span-7 bg-white p-4 rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-lg font-semibold text-gray-700">Tournament Grid</h2>
+                    <div class="flex gap-3 text-xs font-normal bg-gray-50 p-2 rounded-lg">
+                        <span class="flex items-center gap-1"><div class="w-3 h-3 bg-green-500 rounded-sm"></div> Coop/Coop</span>
+                        <span class="flex items-center gap-1"><div class="w-3 h-3 bg-red-500 rounded-sm"></div> Def/Def</span>
+                        <span class="flex items-center gap-1"><div class="w-3 h-3 bg-yellow-400 rounded-sm"></div> A Exploits</span>
+                        <span class="flex items-center gap-1"><div class="w-3 h-3 bg-blue-500 rounded-sm"></div> B Exploits</span>
+                    </div>
+                </div>
+                
+                <div class="relative overflow-auto pb-4" style="min-width: 600px;">
+                    <!-- Axis Labels -->
+                    <div class="flex ml-24 mb-2">
+                        <div id="top-labels" class="flex flex-row text-center gap-[2px] w-[610px] pl-1 pr-1"></div>
+                    </div>
+
+                    <div class="flex">
+                        <div id="left-labels" class="flex flex-col justify-around w-24 mr-2 text-right"></div>
+                        
+                        <div id="grid-container" class="grid grid-cols-15 gap-[2px] bg-gray-100 p-1 rounded border border-gray-200" style="width: 600px; height: 600px;">
+                            <!-- Cells generated by JS -->
+                        </div>
+                    </div>
+                </div>
             </div>
 
-            <div class="p-6 space-y-8 flex-1">
+            <!-- Right Column: Match Detail & Leaderboard -->
+            <div class="xl:col-span-5 space-y-6 flex flex-col h-full">
+                
+                <!-- Match Details Panel -->
+                <div id="match-detail-panel" class="bg-white p-0 rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col transition-all duration-300">
+                    <div class="p-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
+                        <h2 class="text-sm font-bold text-gray-700 uppercase tracking-wide">Match Analysis</h2>
+                        <span id="detail-coordinates" class="text-xs font-mono text-gray-400">Select a cell</span>
+                    </div>
 
-                <!-- Top Section: Rotors -->
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    
-                    <!-- Rotor Configuration -->
-                    <div class="bg-neutral-900/50 p-4 rounded-lg border border-neutral-700">
-                        <h2 class="text-amber-500 mb-3 text-sm uppercase tracking-widest border-b border-neutral-700 pb-1">Internal Mechanism</h2>
-                        
-                        <div class="flex justify-between items-center text-xs text-neutral-400 mb-2 px-2">
-                            <span>Slot</span>
-                            <span>Rotor</span>
-                            <span>Ring</span>
-                            <span>Position</span>
+                    <div id="detail-content-placeholder" class="p-8 text-center text-gray-400 text-sm">
+                        Click on any square in the grid to view the round-by-round timeline.
+                    </div>
+
+                    <div id="detail-content" class="hidden flex-col">
+                        <!-- Players Header -->
+                        <div class="grid grid-cols-2 text-center border-b border-gray-100">
+                            <div class="p-3 border-r border-gray-100 bg-white">
+                                <div id="p1-name" class="font-bold text-gray-800 text-sm">Strategy A</div>
+                                <div id="p1-score" class="text-2xl font-mono text-indigo-600 font-bold">0</div>
+                            </div>
+                            <div class="p-3 bg-white">
+                                <div id="p2-name" class="font-bold text-gray-800 text-sm">Strategy B</div>
+                                <div id="p2-score" class="text-2xl font-mono text-indigo-600 font-bold">0</div>
+                            </div>
                         </div>
 
-                        <!-- Rotor Slots -->
-                        <div class="space-y-3" id="rotor-settings">
-                            <!-- Left Rotor -->
-                            <div class="flex items-center gap-2">
-                                <span class="w-8 text-neutral-500 font-bold">L</span>
-                                <select id="rotor-type-0" class="bg-neutral-800 border border-neutral-600 rounded px-2 py-1 text-amber-100 focus:outline-none focus:border-amber-500 text-sm">
-                                    <option value="I" selected>I</option>
-                                    <option value="II">II</option>
-                                    <option value="III">III</option>
-                                </select>
-                                <input type="number" id="ring-setting-0" min="1" max="26" value="1" class="w-12 bg-neutral-800 border border-neutral-600 rounded px-2 py-1 text-center focus:outline-none focus:border-amber-500 text-sm" title="Ring Setting (1-26)">
-                                <div class="relative flex-1">
-                                    <button onclick="adjustRotor(0, 1)" class="absolute -top-3 left-1/2 -translate-x-1/2 text-neutral-500 hover:text-amber-500 text-xs">▲</button>
-                                    <div id="rotor-disp-0" class="bg-neutral-200 text-black font-bold text-center py-1 rounded shadow-inner text-lg font-mono">A</div>
-                                    <button onclick="adjustRotor(0, -1)" class="absolute -bottom-3 left-1/2 -translate-x-1/2 text-neutral-500 hover:text-amber-500 text-xs">▼</button>
-                                </div>
-                            </div>
-
-                            <!-- Middle Rotor -->
-                            <div class="flex items-center gap-2">
-                                <span class="w-8 text-neutral-500 font-bold">M</span>
-                                <select id="rotor-type-1" class="bg-neutral-800 border border-neutral-600 rounded px-2 py-1 text-amber-100 focus:outline-none focus:border-amber-500 text-sm">
-                                    <option value="I">I</option>
-                                    <option value="II" selected>II</option>
-                                    <option value="III">III</option>
-                                </select>
-                                <input type="number" id="ring-setting-1" min="1" max="26" value="1" class="w-12 bg-neutral-800 border border-neutral-600 rounded px-2 py-1 text-center focus:outline-none focus:border-amber-500 text-sm" title="Ring Setting (1-26)">
-                                <div class="relative flex-1">
-                                    <button onclick="adjustRotor(1, 1)" class="absolute -top-3 left-1/2 -translate-x-1/2 text-neutral-500 hover:text-amber-500 text-xs">▲</button>
-                                    <div id="rotor-disp-1" class="bg-neutral-200 text-black font-bold text-center py-1 rounded shadow-inner text-lg font-mono">A</div>
-                                    <button onclick="adjustRotor(1, -1)" class="absolute -bottom-3 left-1/2 -translate-x-1/2 text-neutral-500 hover:text-amber-500 text-xs">▼</button>
-                                </div>
-                            </div>
-
-                            <!-- Right Rotor -->
-                            <div class="flex items-center gap-2">
-                                <span class="w-8 text-neutral-500 font-bold">R</span>
-                                <select id="rotor-type-2" class="bg-neutral-800 border border-neutral-600 rounded px-2 py-1 text-amber-100 focus:outline-none focus:border-amber-500 text-sm">
-                                    <option value="I">I</option>
-                                    <option value="II">II</option>
-                                    <option value="III" selected>III</option>
-                                </select>
-                                <input type="number" id="ring-setting-2" min="1" max="26" value="1" class="w-12 bg-neutral-800 border border-neutral-600 rounded px-2 py-1 text-center focus:outline-none focus:border-amber-500 text-sm" title="Ring Setting (1-26)">
-                                <div class="relative flex-1">
-                                    <button onclick="adjustRotor(2, 1)" class="absolute -top-3 left-1/2 -translate-x-1/2 text-neutral-500 hover:text-amber-500 text-xs">▲</button>
-                                    <div id="rotor-disp-2" class="bg-neutral-200 text-black font-bold text-center py-1 rounded shadow-inner text-lg font-mono">A</div>
-                                    <button onclick="adjustRotor(2, -1)" class="absolute -bottom-3 left-1/2 -translate-x-1/2 text-neutral-500 hover:text-amber-500 text-xs">▼</button>
+                        <!-- Timeline -->
+                        <div class="p-4 bg-gray-50 border-b border-gray-200">
+                            <h3 class="text-xs font-semibold text-gray-500 mb-2 uppercase">Interaction Timeline</h3>
+                            <div class="timeline-scroll overflow-x-auto pb-2">
+                                <div id="timeline-container" class="flex gap-1" style="min-width: max-content;">
+                                    <!-- Timeline bars go here -->
                                 </div>
                             </div>
                         </div>
-                    </div>
 
-                    <!-- Plugboard -->
-                    <div class="bg-neutral-900/50 p-4 rounded-lg border border-neutral-700 flex flex-col">
-                        <h2 class="text-amber-500 mb-3 text-sm uppercase tracking-widest border-b border-neutral-700 pb-1">Plugboard</h2>
-                        <p class="text-xs text-neutral-400 mb-2">Connect pairs (e.g. AB CD)</p>
-                        <input type="text" id="plugboard-input" 
-                            class="bg-neutral-800 border border-neutral-600 rounded p-2 text-amber-100 font-mono uppercase tracking-widest focus:outline-none focus:border-amber-500 w-full text-sm"
-                            placeholder="AB CD EF..." oninput="validatePlugboard(this)">
-                        <div id="plugboard-error" class="text-red-500 text-xs mt-1 h-4 truncate"></div>
-                        
-                        <div class="mt-auto pt-4 flex gap-2">
-                            <button onclick="resetMachine()" class="flex-1 bg-red-900/50 hover:bg-red-900 text-red-200 py-2 rounded border border-red-800 transition text-xs font-bold uppercase">Reset Rotors</button>
-                            <button onclick="clearText()" class="flex-1 bg-neutral-700 hover:bg-neutral-600 text-white py-2 rounded border border-neutral-600 transition text-xs font-bold uppercase">Clear</button>
+                        <div class="p-3 text-xs text-gray-500 bg-white flex justify-between">
+                            <span>Scoring: (C,C)=3, (D,D)=1, (D,C)=5/0</span>
+                            <span id="detail-round-count">Round 0</span>
                         </div>
                     </div>
-
                 </div>
 
-                <!-- Lampboard (Output) -->
-                <div class="wood-texture p-4 md:p-6 rounded-xl shadow-inner border-4 border-neutral-900 relative">
-                    <div class="absolute top-2 left-0 w-full text-center opacity-30 pointer-events-none">
-                        <span class="text-3xl md:text-4xl font-bold text-black tracking-widest">ENIGMA</span>
-                    </div>
-                    <!-- Lamps Grid -->
-                    <div class="grid gap-1 md:gap-2 justify-center mb-2" style="grid-template-columns: repeat(10, minmax(0, 1fr));">
-                        <div id="lamp-Q" class="lamp w-7 h-7 md:w-10 md:h-10 rounded-full bg-neutral-800 border border-neutral-600 flex items-center justify-center font-bold text-neutral-500 select-none text-sm md:text-base">Q</div>
-                        <div id="lamp-W" class="lamp w-7 h-7 md:w-10 md:h-10 rounded-full bg-neutral-800 border border-neutral-600 flex items-center justify-center font-bold text-neutral-500 select-none text-sm md:text-base">W</div>
-                        <div id="lamp-E" class="lamp w-7 h-7 md:w-10 md:h-10 rounded-full bg-neutral-800 border border-neutral-600 flex items-center justify-center font-bold text-neutral-500 select-none text-sm md:text-base">E</div>
-                        <div id="lamp-R" class="lamp w-7 h-7 md:w-10 md:h-10 rounded-full bg-neutral-800 border border-neutral-600 flex items-center justify-center font-bold text-neutral-500 select-none text-sm md:text-base">R</div>
-                        <div id="lamp-T" class="lamp w-7 h-7 md:w-10 md:h-10 rounded-full bg-neutral-800 border border-neutral-600 flex items-center justify-center font-bold text-neutral-500 select-none text-sm md:text-base">T</div>
-                        <div id="lamp-Z" class="lamp w-7 h-7 md:w-10 md:h-10 rounded-full bg-neutral-800 border border-neutral-600 flex items-center justify-center font-bold text-neutral-500 select-none text-sm md:text-base">Z</div>
-                        <div id="lamp-U" class="lamp w-7 h-7 md:w-10 md:h-10 rounded-full bg-neutral-800 border border-neutral-600 flex items-center justify-center font-bold text-neutral-500 select-none text-sm md:text-base">U</div>
-                        <div id="lamp-I" class="lamp w-7 h-7 md:w-10 md:h-10 rounded-full bg-neutral-800 border border-neutral-600 flex items-center justify-center font-bold text-neutral-500 select-none text-sm md:text-base">I</div>
-                        <div id="lamp-O" class="lamp w-7 h-7 md:w-10 md:h-10 rounded-full bg-neutral-800 border border-neutral-600 flex items-center justify-center font-bold text-neutral-500 select-none text-sm md:text-base">O</div>
-                        <div id="lamp-P" class="lamp w-7 h-7 md:w-10 md:h-10 rounded-full bg-neutral-800 border border-neutral-600 flex items-center justify-center font-bold text-neutral-500 select-none text-sm md:text-base">P</div>
-                    </div>
-                    <div class="grid gap-1 md:gap-2 justify-center mb-2 px-4" style="grid-template-columns: repeat(9, minmax(0, 1fr));">
-                        <div id="lamp-A" class="lamp w-7 h-7 md:w-10 md:h-10 rounded-full bg-neutral-800 border border-neutral-600 flex items-center justify-center font-bold text-neutral-500 select-none text-sm md:text-base">A</div>
-                        <div id="lamp-S" class="lamp w-7 h-7 md:w-10 md:h-10 rounded-full bg-neutral-800 border border-neutral-600 flex items-center justify-center font-bold text-neutral-500 select-none text-sm md:text-base">S</div>
-                        <div id="lamp-D" class="lamp w-7 h-7 md:w-10 md:h-10 rounded-full bg-neutral-800 border border-neutral-600 flex items-center justify-center font-bold text-neutral-500 select-none text-sm md:text-base">D</div>
-                        <div id="lamp-F" class="lamp w-7 h-7 md:w-10 md:h-10 rounded-full bg-neutral-800 border border-neutral-600 flex items-center justify-center font-bold text-neutral-500 select-none text-sm md:text-base">F</div>
-                        <div id="lamp-G" class="lamp w-7 h-7 md:w-10 md:h-10 rounded-full bg-neutral-800 border border-neutral-600 flex items-center justify-center font-bold text-neutral-500 select-none text-sm md:text-base">G</div>
-                        <div id="lamp-H" class="lamp w-7 h-7 md:w-10 md:h-10 rounded-full bg-neutral-800 border border-neutral-600 flex items-center justify-center font-bold text-neutral-500 select-none text-sm md:text-base">H</div>
-                        <div id="lamp-J" class="lamp w-7 h-7 md:w-10 md:h-10 rounded-full bg-neutral-800 border border-neutral-600 flex items-center justify-center font-bold text-neutral-500 select-none text-sm md:text-base">J</div>
-                        <div id="lamp-K" class="lamp w-7 h-7 md:w-10 md:h-10 rounded-full bg-neutral-800 border border-neutral-600 flex items-center justify-center font-bold text-neutral-500 select-none text-sm md:text-base">K</div>
-                        <div id="lamp-L" class="lamp w-7 h-7 md:w-10 md:h-10 rounded-full bg-neutral-800 border border-neutral-600 flex items-center justify-center font-bold text-neutral-500 select-none text-sm md:text-base">L</div>
-                    </div>
-                    <div class="grid gap-1 md:gap-2 justify-center px-8" style="grid-template-columns: repeat(7, minmax(0, 1fr));">
-                        <div id="lamp-P" class="hidden"></div>
-                        <div id="lamp-Y" class="lamp w-7 h-7 md:w-10 md:h-10 rounded-full bg-neutral-800 border border-neutral-600 flex items-center justify-center font-bold text-neutral-500 select-none text-sm md:text-base">Y</div>
-                        <div id="lamp-X" class="lamp w-7 h-7 md:w-10 md:h-10 rounded-full bg-neutral-800 border border-neutral-600 flex items-center justify-center font-bold text-neutral-500 select-none text-sm md:text-base">X</div>
-                        <div id="lamp-C" class="lamp w-7 h-7 md:w-10 md:h-10 rounded-full bg-neutral-800 border border-neutral-600 flex items-center justify-center font-bold text-neutral-500 select-none text-sm md:text-base">C</div>
-                        <div id="lamp-V" class="lamp w-7 h-7 md:w-10 md:h-10 rounded-full bg-neutral-800 border border-neutral-600 flex items-center justify-center font-bold text-neutral-500 select-none text-sm md:text-base">V</div>
-                        <div id="lamp-B" class="lamp w-7 h-7 md:w-10 md:h-10 rounded-full bg-neutral-800 border border-neutral-600 flex items-center justify-center font-bold text-neutral-500 select-none text-sm md:text-base">B</div>
-                        <div id="lamp-N" class="lamp w-7 h-7 md:w-10 md:h-10 rounded-full bg-neutral-800 border border-neutral-600 flex items-center justify-center font-bold text-neutral-500 select-none text-sm md:text-base">N</div>
-                        <div id="lamp-M" class="lamp w-7 h-7 md:w-10 md:h-10 rounded-full bg-neutral-800 border border-neutral-600 flex items-center justify-center font-bold text-neutral-500 select-none text-sm md:text-base">M</div>
+                <!-- Live Leaderboard -->
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex-grow flex flex-col">
+                    <h2 class="text-lg font-semibold mb-4 text-gray-700">Live Standings</h2>
+                    <p class="text-xs text-gray-400 mb-2">Click any strategy to see its logic.</p>
+                    <div class="overflow-y-auto pr-2 flex-grow" id="leaderboard" style="max-height: 400px;">
+                        <!-- Leaderboard items -->
                     </div>
                 </div>
 
-                <!-- Keyboard (Input) -->
-                <div class="metal-texture p-4 rounded-xl shadow-lg border-t-2 border-neutral-600">
-                    <div class="grid gap-1 md:gap-2 justify-center mb-2" style="grid-template-columns: repeat(10, minmax(0, 1fr));">
-                        <button onclick="handleInput('Q')" class="key-btn h-10 md:h-12 rounded bg-neutral-200 text-black font-bold shadow-md hover:bg-white text-sm md:text-base">Q</button>
-                        <button onclick="handleInput('W')" class="key-btn h-10 md:h-12 rounded bg-neutral-200 text-black font-bold shadow-md hover:bg-white text-sm md:text-base">W</button>
-                        <button onclick="handleInput('E')" class="key-btn h-10 md:h-12 rounded bg-neutral-200 text-black font-bold shadow-md hover:bg-white text-sm md:text-base">E</button>
-                        <button onclick="handleInput('R')" class="key-btn h-10 md:h-12 rounded bg-neutral-200 text-black font-bold shadow-md hover:bg-white text-sm md:text-base">R</button>
-                        <button onclick="handleInput('T')" class="key-btn h-10 md:h-12 rounded bg-neutral-200 text-black font-bold shadow-md hover:bg-white text-sm md:text-base">T</button>
-                        <button onclick="handleInput('Z')" class="key-btn h-10 md:h-12 rounded bg-neutral-200 text-black font-bold shadow-md hover:bg-white text-sm md:text-base">Z</button>
-                        <button onclick="handleInput('U')" class="key-btn h-10 md:h-12 rounded bg-neutral-200 text-black font-bold shadow-md hover:bg-white text-sm md:text-base">U</button>
-                        <button onclick="handleInput('I')" class="key-btn h-10 md:h-12 rounded bg-neutral-200 text-black font-bold shadow-md hover:bg-white text-sm md:text-base">I</button>
-                        <button onclick="handleInput('O')" class="key-btn h-10 md:h-12 rounded bg-neutral-200 text-black font-bold shadow-md hover:bg-white text-sm md:text-base">O</button>
-                        <button onclick="handleInput('P')" class="key-btn h-10 md:h-12 rounded bg-neutral-200 text-black font-bold shadow-md hover:bg-white text-sm md:text-base">P</button>
-                    </div>
-                    <div class="grid gap-1 md:gap-2 justify-center mb-2 px-4" style="grid-template-columns: repeat(9, minmax(0, 1fr));">
-                        <button onclick="handleInput('A')" class="key-btn h-10 md:h-12 rounded bg-neutral-200 text-black font-bold shadow-md hover:bg-white text-sm md:text-base">A</button>
-                        <button onclick="handleInput('S')" class="key-btn h-10 md:h-12 rounded bg-neutral-200 text-black font-bold shadow-md hover:bg-white text-sm md:text-base">S</button>
-                        <button onclick="handleInput('D')" class="key-btn h-10 md:h-12 rounded bg-neutral-200 text-black font-bold shadow-md hover:bg-white text-sm md:text-base">D</button>
-                        <button onclick="handleInput('F')" class="key-btn h-10 md:h-12 rounded bg-neutral-200 text-black font-bold shadow-md hover:bg-white text-sm md:text-base">F</button>
-                        <button onclick="handleInput('G')" class="key-btn h-10 md:h-12 rounded bg-neutral-200 text-black font-bold shadow-md hover:bg-white text-sm md:text-base">G</button>
-                        <button onclick="handleInput('H')" class="key-btn h-10 md:h-12 rounded bg-neutral-200 text-black font-bold shadow-md hover:bg-white text-sm md:text-base">H</button>
-                        <button onclick="handleInput('J')" class="key-btn h-10 md:h-12 rounded bg-neutral-200 text-black font-bold shadow-md hover:bg-white text-sm md:text-base">J</button>
-                        <button onclick="handleInput('K')" class="key-btn h-10 md:h-12 rounded bg-neutral-200 text-black font-bold shadow-md hover:bg-white text-sm md:text-base">K</button>
-                        <button onclick="handleInput('L')" class="key-btn h-10 md:h-12 rounded bg-neutral-200 text-black font-bold shadow-md hover:bg-white text-sm md:text-base">L</button>
-                    </div>
-                    <div class="grid gap-1 md:gap-2 justify-center px-8" style="grid-template-columns: repeat(7, minmax(0, 1fr));">
-                        <button onclick="handleInput('Y')" class="key-btn h-10 md:h-12 rounded bg-neutral-200 text-black font-bold shadow-md hover:bg-white text-sm md:text-base">Y</button>
-                        <button onclick="handleInput('X')" class="key-btn h-10 md:h-12 rounded bg-neutral-200 text-black font-bold shadow-md hover:bg-white text-sm md:text-base">X</button>
-                        <button onclick="handleInput('C')" class="key-btn h-10 md:h-12 rounded bg-neutral-200 text-black font-bold shadow-md hover:bg-white text-sm md:text-base">C</button>
-                        <button onclick="handleInput('V')" class="key-btn h-10 md:h-12 rounded bg-neutral-200 text-black font-bold shadow-md hover:bg-white text-sm md:text-base">V</button>
-                        <button onclick="handleInput('B')" class="key-btn h-10 md:h-12 rounded bg-neutral-200 text-black font-bold shadow-md hover:bg-white text-sm md:text-base">B</button>
-                        <button onclick="handleInput('N')" class="key-btn h-10 md:h-12 rounded bg-neutral-200 text-black font-bold shadow-md hover:bg-white text-sm md:text-base">N</button>
-                        <button onclick="handleInput('M')" class="key-btn h-10 md:h-12 rounded bg-neutral-200 text-black font-bold shadow-md hover:bg-white text-sm md:text-base">M</button>
-                    </div>
-                </div>
+            </div>
+        </div>
 
-                <!-- Output Log with Save Button -->
-                <div class="relative">
-                    <div class="bg-neutral-900 border border-neutral-700 rounded p-4 h-32 overflow-auto font-mono text-lg tracking-widest break-all" id="output-text">
-                        <span class="text-neutral-600 italic text-sm">// Encrypted output...</span>
-                    </div>
-                    <button onclick="saveMessage()" class="absolute bottom-2 right-2 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold px-3 py-1 rounded shadow transition">
-                        SAVE & CLEAR (ENTER)
+        <!-- Strategy Logic Modal -->
+        <div id="strategy-modal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center backdrop-blur-sm" onclick="closeModal()">
+            <div class="bg-white rounded-xl shadow-2xl p-6 max-w-lg w-full mx-4 transform transition-all scale-95 opacity-0" id="modal-content" onclick="event.stopPropagation()">
+                <div class="flex justify-between items-start mb-4">
+                    <h2 id="modal-title" class="text-2xl font-bold text-gray-800">Strategy Name</h2>
+                    <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                     </button>
                 </div>
-
-            </div>
-        </div>
-
-        <!-- Right Column: History -->
-        <div class="bg-neutral-800 flex flex-col h-full border-t lg:border-t-0 lg:border-l border-neutral-700">
-            <div class="bg-neutral-900 p-4 border-b border-neutral-700">
-                <h2 class="text-xl font-bold text-neutral-300 font-mono">MESSAGE LOG</h2>
-                <div class="text-xs text-neutral-500">History & Settings Snapshot</div>
-            </div>
-            
-            <div class="flex-1 overflow-y-auto p-4 space-y-4" id="history-container">
-                <div class="text-center text-neutral-600 text-sm mt-10 italic">
-                    No saved messages.<br>Type and press Enter to save.
+                <div class="bg-indigo-50 p-4 rounded-lg border border-indigo-100 mb-4">
+                    <p id="modal-desc" class="text-gray-700 leading-relaxed"></p>
+                </div>
+                <div class="text-xs text-gray-500 text-right">
+                    Based on Axelrod's "The Evolution of Cooperation"
                 </div>
             </div>
         </div>
+
+        <!-- Disclaimer Footer -->
+        <footer class="mt-8 text-center text-xs text-gray-400 border-t border-gray-200 pt-4 pb-2">
+            <p>Disclaimer: The strategies implemented here are approximations based on descriptions from Robert Axelrod's "The Evolution of Cooperation". As the original 1980 source code is not publicly available, specific implementation details (like exact random seeds, tie-breaking logic, or complex look-back depths) may differ from the original tournament.</p>
+        </footer>
+
     </div>
 
+    <!-- Logic Script -->
     <script>
-        // --- CONSTANTS ---
-        const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        // --- Game Constants & State ---
+        const MAX_ROUNDS = 200; 
+        let currentRound = 0;
+        let isPlaying = false;
+        let intervalId = null;
+        let speed = 25; 
+
+        // Payoffs
+        const R = 3; 
+        const P = 1; 
+        const T = 5; 
+        const S = 0; 
+
+        const COOP = 0;
+        const DEFECT = 1;
+
+        // Selection State
+        let selectedMatch = { row: null, col: null };
+
+        // --- Strategy Definitions ---
+        const getLastMove = (history) => history.length > 0 ? history[history.length - 1] : null;
         
-        // Rotor Wirings (Input A->Z maps to string)
-        const ROTORS = {
-            I:   { wiring: "EKMFLGDQVZNTOWYHXUSPAIBRCJ", notch: "Q" },
-            II:  { wiring: "AJDKSIRUXBLHWTMCQGZNPYFVOE", notch: "E" },
-            III: { wiring: "BDFHJLCPRTXVZNYEIWGAKMUSQO", notch: "V" }
+        // 1. TIT FOR TAT
+        const titForTat = (myHistory, oppHistory) => {
+            if (oppHistory.length === 0) return COOP;
+            return oppHistory[oppHistory.length - 1];
         };
-        
-        const REFLECTOR_B = "YRUHQSLDPXNGOKMIEBFZCWVJAT";
 
-        // --- STATE ---
-        let currentRotors = [
-            { type: 'I',  pos: 0, ring: 0 }, // Left
-            { type: 'II', pos: 0, ring: 0 }, // Middle
-            { type: 'III',pos: 0, ring: 0 }  // Right
+        // 2. TIDEMAN AND CHIERUZZI
+        const tideman = (myHistory, oppHistory, myScore, oppScore) => {
+            if (oppHistory.length === 0) return COOP;
+            if (myScore < oppScore - 10 && currentRound > 20 && myHistory[myHistory.length-1] === DEFECT) {
+                return COOP; 
+            }
+            return oppHistory[oppHistory.length - 1];
+        };
+
+        // 3. NYDEGGER
+        const nydegger = (myHistory, oppHistory) => {
+            if (oppHistory.length < 3) return (oppHistory.length === 0) ? COOP : titForTat(myHistory, oppHistory);
+            let A = 0;
+            for (let i = 1; i <= 3; i++) {
+                let idx = oppHistory.length - i;
+                let oppM = oppHistory[idx];
+                let myM = myHistory[idx];
+                let val = 0;
+                if (myM === COOP && oppM === COOP) val = 0;
+                else if (myM === DEFECT && oppM === COOP) val = 1;
+                else if (myM === COOP && oppM === DEFECT) val = 2;
+                else val = 3;
+                let weight = (i===3) ? 16 : (i===2) ? 4 : 1;
+                A += val * weight;
+            }
+            const defectSet = [1, 6, 7, 17, 22, 23, 26, 29, 30, 31, 33, 38, 39, 45, 49, 54, 55, 58, 61];
+            return defectSet.includes(A) ? DEFECT : COOP;
+        };
+
+        // 4. GROFMAN
+        const grofman = (myHistory, oppHistory) => {
+            if (oppHistory.length === 0) return COOP;
+            const lastOpp = oppHistory[oppHistory.length - 1];
+            const lastMy = myHistory[myHistory.length - 1];
+            if (lastOpp !== lastMy) {
+                return (Math.random() < (2/7)) ? COOP : DEFECT;
+            }
+            return COOP;
+        };
+
+        // 5. SHUBIK
+        const shubik = (myHistory, oppHistory) => {
+             if (oppHistory.length === 0) return COOP;
+             let retaliationCount = 0;
+             let inRun = false;
+             for(let m of oppHistory) {
+                 if(m === DEFECT && !inRun) { retaliationCount++; inRun = true; }
+                 else if (m === COOP) inRun = false;
+             }
+             if (getLastMove(oppHistory) === DEFECT) return DEFECT;
+             
+             let lastOppDefectIdx = oppHistory.lastIndexOf(DEFECT);
+             if (lastOppDefectIdx === -1) return COOP;
+             
+             let turnsSince = oppHistory.length - 1 - lastOppDefectIdx;
+             if (turnsSince < retaliationCount) return DEFECT;
+             return COOP;
+        };
+
+        // 6. STEIN AND RAPOPORT
+        const stein = (myHistory, oppHistory) => {
+            const r = currentRound + 1;
+            if (r <= 4) return COOP;
+            if (r >= MAX_ROUNDS - 1) return DEFECT;
+            return titForTat(myHistory, oppHistory);
+        };
+
+        // 7. FRIEDMAN (Grudger)
+        const friedman = (myHistory, oppHistory) => {
+            if (oppHistory.includes(DEFECT)) return DEFECT;
+            return COOP;
+        };
+
+        // 8. DAVIS
+        const davis = (myHistory, oppHistory) => {
+            if (currentRound < 10) return COOP;
+            if (oppHistory.includes(DEFECT)) return DEFECT;
+            return COOP;
+        };
+
+        // 9. GRAASKAMP
+        const graaskamp = (myHistory, oppHistory) => {
+            const r = currentRound + 1;
+            if (r === 51) return DEFECT;
+            if (r > 52 && r % 15 === 0) return DEFECT; 
+            return titForTat(myHistory, oppHistory);
+        };
+
+        // 10. DOWNING
+        const downing = (myHistory, oppHistory) => {
+            if (currentRound === 0) return DEFECT;
+            if (currentRound === 1) return DEFECT; 
+            let c_c = 0, c_total = 0, d_c = 0, d_total = 0;
+            for(let i=0; i<myHistory.length-1; i++) {
+                if (myHistory[i] === COOP) {
+                    c_total++;
+                    if (oppHistory[i+1] === COOP) c_c++;
+                } else {
+                    d_total++;
+                    if (oppHistory[i+1] === COOP) d_c++;
+                }
+            }
+            let prob_c_given_c = c_total === 0 ? 0.5 : c_c / c_total;
+            let prob_c_given_d = d_total === 0 ? 0.5 : d_c / d_total;
+            let ev_coop = prob_c_given_c * 3 + (1 - prob_c_given_c) * 0;
+            let ev_defect = prob_c_given_d * 5 + (1 - prob_c_given_d) * 1;
+            return (ev_coop > ev_defect) ? COOP : DEFECT;
+        };
+
+        // 11. FELD
+        const feld = (myHistory, oppHistory) => {
+            if (oppHistory.length > 0 && oppHistory[oppHistory.length-1] === DEFECT) return DEFECT;
+            const prob = 1.0 - (currentRound / MAX_ROUNDS) * 0.5;
+            return (Math.random() < prob) ? COOP : DEFECT;
+        };
+
+        // 12. JOSS
+        const joss = (myHistory, oppHistory) => {
+            if (oppHistory.length === 0) return COOP;
+            if (oppHistory[oppHistory.length-1] === DEFECT) return DEFECT;
+            return (Math.random() < 0.10) ? DEFECT : COOP;
+        };
+
+        // 13. TULLOCK
+        const tullock = (myHistory, oppHistory) => {
+            if (currentRound < 11) return COOP;
+            const last10 = oppHistory.slice(-10);
+            const coopCount = last10.filter(m => m === COOP).length;
+            const oppCoopRate = coopCount / 10;
+            const myProb = Math.max(0, oppCoopRate - 0.10);
+            return (Math.random() < myProb) ? COOP : DEFECT;
+        };
+
+        // 14. NAME WITHHELD
+        const unnamed = (myHistory, oppHistory) => {
+             if (currentRound === 0) return (Math.random() < 0.3) ? COOP : DEFECT;
+             const oppCoops = oppHistory.filter(m => m === COOP).length;
+             const rate = oppCoops / oppHistory.length;
+             if (rate > 0.7) return COOP;
+             return (Math.random() < 0.3) ? COOP : DEFECT;
+        };
+
+        // 15. RANDOM
+        const randomStrat = () => (Math.random() < 0.5) ? COOP : DEFECT;
+
+        const strategies = [
+            { 
+                name: "Tit For Tat", 
+                func: titForTat, 
+                id: 0, 
+                color: "border-blue-500", 
+                desc: "Cooperates on the first move. For every subsequent move, it simply copies the opponent's previous move. It is nice (never defects first), forgiving (retaliates only once), and provokable." 
+            },
+            { 
+                name: "Tideman & Chieruzzi", 
+                func: tideman, 
+                id: 1, 
+                color: "border-indigo-500", 
+                desc: "A complex strategy that retaliates to defections but tries to break cycles of mutual defection if it falls far behind, effectively offering a 'fresh start' to a punishing opponent." 
+            },
+            { 
+                name: "Nydegger", 
+                func: nydegger, 
+                id: 2, 
+                color: "border-purple-500", 
+                desc: "Determines its move based on a weighted formula of the last 3 outcomes. It checks if the calculated value exists in a predefined 'defect set'. It is generally stoic and cooperative but not easily exploited." 
+            },
+            { 
+                name: "Grofman", 
+                func: grofman, 
+                id: 3, 
+                color: "border-pink-500", 
+                desc: "If the moves in the previous round differed, it cooperates with probability 2/7. Otherwise, it cooperates. This randomness helps prevent getting stuck in alternating defect loops." 
+            },
+            { 
+                name: "Shubik", 
+                func: shubik, 
+                id: 4, 
+                color: "border-red-500", 
+                desc: "Retaliates with increasing severity. The length of its retaliation string (series of defects) increases by 1 each time the opponent defects against it." 
+            },
+            { 
+                name: "Stein & Rapoport", 
+                func: stein, 
+                id: 5, 
+                color: "border-orange-500", 
+                desc: "A modification of Tit For Tat. It cooperates unconditionally for the first 4 moves, defects unconditionally for the last 2 moves (to squeeze end-game points), and plays Tit For Tat in between." 
+            },
+            { 
+                name: "Friedman", 
+                func: friedman, 
+                id: 6, 
+                color: "border-yellow-500", 
+                desc: "Also known as 'Grudger'. It cooperates until the opponent defects just once. After that single betrayal, it defects forever and never forgives." 
+            },
+            { 
+                name: "Davis", 
+                func: davis, 
+                id: 7, 
+                color: "border-lime-500", 
+                desc: "Cooperates for the first 10 moves to build trust. If the opponent defects at any point (even during the first 10), it switches to a 'Grudger' strategy and defects forever." 
+            },
+            { 
+                name: "Graaskamp", 
+                func: graaskamp, 
+                id: 8, 
+                color: "border-green-500", 
+                desc: "Plays Tit For Tat for 50 moves. On move 51, it defects to seize an advantage. It also checks every 15 moves and defects randomly to test if the opponent can be exploited." 
+            },
+            { 
+                name: "Downing", 
+                func: downing, 
+                id: 9, 
+                color: "border-teal-500", 
+                desc: "Estimates the probability that the opponent will cooperate given its own previous move. It acts to maximize its expected payoff based on these running estimates. Starts by Defecting." 
+            },
+            { 
+                name: "Feld", 
+                func: feld, 
+                id: 10, 
+                color: "border-cyan-500", 
+                desc: "Plays Tit For Tat, but the probability of maintaining cooperation declines linearly over the course of the game. It becomes increasingly aggressive as the game nears the end." 
+            },
+            { 
+                name: "Joss", 
+                func: joss, 
+                id: 11, 
+                color: "border-sky-500", 
+                desc: "Plays Tit For Tat, but with a nasty twist: it defects 10% of the time even when it 'should' cooperate. This random aggression tries to exploit nice strategies but often causes conflict spirals." 
+            },
+            { 
+                name: "Tullock", 
+                func: tullock, 
+                id: 12, 
+                color: "border-indigo-400", 
+                desc: "Cooperates for 11 moves. Then, it cooperates with a probability that is 10% less than the opponent's cooperation rate over the last 10 moves. It punishes lack of cooperation slightly more harshly." 
+            },
+            { 
+                name: "Name Withheld", 
+                func: unnamed, 
+                id: 13, 
+                color: "border-violet-400", 
+                desc: "A submission that remained anonymous. It acts randomly initially but attempts to align its behavior if the opponent shows a high frequency of cooperation (>70%)." 
+            },
+            { 
+                name: "Random", 
+                func: randomStrat, 
+                id: 14, 
+                color: "border-gray-400", 
+                desc: "The baseline control. It essentially flips a coin every turn. 50% chance to Cooperate, 50% chance to Defect, regardless of history." 
+            }
         ];
-        
-        let plugboard = new Map();
-        let outputString = "";
-        
-        // State tracking for History
-        let isTypingMessage = false;
-        let startSettingsSnapshot = null;
-        let messageHistory = [];
 
-        // --- INITIALIZATION ---
-        function init() {
-            updateUI();
+        // --- Tournament State ---
+        let matches = [];
+        let totalScores = new Array(15).fill(0);
+
+        function initTournament() {
+            matches = [];
+            totalScores = new Array(15).fill(0);
             
-            // Physical Keyboard Listener
-            document.addEventListener('keydown', (e) => {
-                // Prevent typing into machine while editing settings
-                if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
-
-                if (e.repeat) return;
-                
-                if (e.key === 'Enter') {
-                    saveMessage();
-                    return;
+            for (let i = 0; i < 15; i++) {
+                matches[i] = [];
+                for (let j = 0; j < 15; j++) {
+                    matches[i][j] = {
+                        historyA: [],
+                        historyB: [],
+                        scoreA: 0,
+                        scoreB: 0
+                    };
                 }
-
-                const key = e.key.toUpperCase();
-                if (ALPHABET.includes(key)) {
-                    handleInput(key);
-                }
-            });
-
-            document.addEventListener('keyup', (e) => {
-                const lamps = document.querySelectorAll('.lamp');
-                lamps.forEach(l => l.classList.remove('active'));
-            });
-        }
-
-        // --- CORE LOGIC ---
-
-        function charToIndex(char) {
-            return char.charCodeAt(0) - 65;
-        }
-
-        function indexToChar(index) {
-            return String.fromCharCode(((index % 26 + 26) % 26) + 65);
-        }
-
-        function mod(n, m) {
-            return ((n % m) + m) % m;
-        }
-
-        function plugboardSwap(charIndex) {
-            const char = indexToChar(charIndex);
-            if (plugboard.has(char)) {
-                return charToIndex(plugboard.get(char));
             }
-            return charIndex;
-        }
-
-        function rotorForward(rotorIndex, charIndex) {
-            const rotor = currentRotors[rotorIndex];
-            const data = ROTORS[rotor.type];
-            const offset = rotor.pos - rotor.ring;
-            let inputPos = mod(charIndex + offset, 26);
-            let internalWire = charToIndex(data.wiring[inputPos]);
-            let outputPos = mod(internalWire - offset, 26);
-            return outputPos;
-        }
-
-        function rotorInverse(rotorIndex, charIndex) {
-            const rotor = currentRotors[rotorIndex];
-            const data = ROTORS[rotor.type];
-            const offset = rotor.pos - rotor.ring;
-            let inputPos = mod(charIndex + offset, 26);
-            let internalWire = data.wiring.indexOf(indexToChar(inputPos));
-            let outputPos = mod(internalWire - offset, 26);
-            return outputPos;
-        }
-
-        function reflector(charIndex) {
-            return charToIndex(REFLECTOR_B[charIndex]);
-        }
-
-        function stepRotors() {
-            const right = currentRotors[2];
-            const middle = currentRotors[1];
-            const left = currentRotors[0];
-            
-            const rightNotch = ROTORS[right.type].notch === indexToChar(right.pos);
-            const middleNotch = ROTORS[middle.type].notch === indexToChar(middle.pos);
-
-            let rotateRight = true;
-            let rotateMiddle = false;
-            let rotateLeft = false;
-
-            if (middleNotch) {
-                rotateMiddle = true;
-                rotateLeft = true;
-            } else if (rightNotch) {
-                rotateMiddle = true;
-            }
-
-            if (rotateRight) right.pos = (right.pos + 1) % 26;
-            if (rotateMiddle) middle.pos = (middle.pos + 1) % 26;
-            if (rotateLeft) left.pos = (left.pos + 1) % 26;
-            
+            renderGridStructure();
             updateUI();
         }
 
-        function encryptChar(inputChar) {
-            stepRotors();
-            let c = charToIndex(inputChar);
-            c = plugboardSwap(c);
-            c = rotorForward(2, c);
-            c = rotorForward(1, c);
-            c = rotorForward(0, c);
-            c = reflector(c);
-            c = rotorInverse(0, c);
-            c = rotorInverse(1, c);
-            c = rotorInverse(2, c);
-            c = plugboardSwap(c);
-            return indexToChar(c);
-        }
-
-        // --- HISTORY & STATE MANAGEMENT ---
-
-        function captureSettings() {
-            // Deep copy rotors to avoid reference issues
-            return {
-                rotors: JSON.parse(JSON.stringify(currentRotors)),
-                plugboard: document.getElementById('plugboard-input').value
-            };
-        }
-
-        function saveMessage() {
-            if (outputString.length === 0) return;
-
-            // If we started typing, we have a snapshot. If not, take one now (edge case)
-            if (!startSettingsSnapshot) {
-                startSettingsSnapshot = captureSettings();
-            }
-
-            const entry = {
-                id: Date.now(),
-                text: outputString,
-                settings: startSettingsSnapshot
-            };
-
-            messageHistory.unshift(entry);
-            renderHistory();
-            clearText(); // Reset for next message
-        }
-
-        function restoreSettings(id) {
-            const entry = messageHistory.find(e => e.id === id);
-            if (!entry) return;
-
-            // Restore Rotors
-            currentRotors = JSON.parse(JSON.stringify(entry.settings.rotors));
-            
-            // Restore Plugboard
-            const plugInput = document.getElementById('plugboard-input');
-            plugInput.value = entry.settings.plugboard;
-            validatePlugboard(plugInput); // Re-run validation logic to populate Map
-
-            // Update UI elements
-            [0,1,2].forEach(i => {
-                document.getElementById(`rotor-type-${i}`).value = currentRotors[i].type;
-                document.getElementById(`ring-setting-${i}`).value = currentRotors[i].ring + 1;
-            });
-            
-            updateUI();
-            
-            // Clear current text so user can start typing immediately
-            clearText();
-        }
-
-        function deleteHistory(id, event) {
-            event.stopPropagation();
-            messageHistory = messageHistory.filter(e => e.id !== id);
-            renderHistory();
-        }
-
-        function renderHistory() {
-            const container = document.getElementById('history-container');
-            container.innerHTML = '';
-            
-            if (messageHistory.length === 0) {
-                container.innerHTML = `
-                    <div class="text-center text-neutral-600 text-sm mt-10 italic">
-                        No saved messages.<br>Type and press Enter to save.
-                    </div>
-                `;
+        function playRound() {
+            if (currentRound >= MAX_ROUNDS) {
+                stopGame();
                 return;
             }
 
-            messageHistory.forEach(entry => {
-                // Format settings string
-                const rotorsStr = `${entry.settings.rotors[0].type}-${entry.settings.rotors[1].type}-${entry.settings.rotors[2].type}`;
-                const ringsStr = `${entry.settings.rotors[0].ring+1}.${entry.settings.rotors[1].ring+1}.${entry.settings.rotors[2].ring+1}`;
-                const posStr = `${indexToChar(entry.settings.rotors[0].pos)}${indexToChar(entry.settings.rotors[1].pos)}${indexToChar(entry.settings.rotors[2].pos)}`;
-                
-                const item = document.createElement('div');
-                item.className = "bg-neutral-700/50 rounded p-3 border border-neutral-600 hover:border-amber-500 cursor-pointer transition group relative";
-                item.onclick = () => restoreSettings(entry.id);
-                
-                item.innerHTML = `
-                    <div class="flex justify-between items-start mb-2">
-                        <div class="text-xs text-amber-500 font-bold uppercase tracking-wider">Start Settings</div>
-                        <button onclick="deleteHistory(${entry.id}, event)" class="text-neutral-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition px-1">✕</button>
-                    </div>
-                    <div class="grid grid-cols-3 gap-1 text-xs text-neutral-400 font-mono mb-2 bg-neutral-800/50 p-1 rounded">
-                        <div class="text-center"><span class="block text-neutral-600 text-[10px]">ROTOR</span>${rotorsStr}</div>
-                        <div class="text-center"><span class="block text-neutral-600 text-[10px]">RING</span>${ringsStr}</div>
-                        <div class="text-center"><span class="block text-neutral-600 text-[10px]">POS</span><span class="text-white font-bold">${posStr}</span></div>
-                    </div>
-                    <div class="text-neutral-300 font-mono text-sm break-all leading-relaxed border-t border-neutral-600 pt-2">
-                        ${entry.text}
-                    </div>
-                    <div class="mt-2 text-xs text-center text-amber-500/0 group-hover:text-amber-500/100 transition font-bold">
-                        CLICK TO RESTORE & DECRYPT
-                    </div>
-                `;
-                container.appendChild(item);
-            });
-        }
+            for (let i = 0; i < 15; i++) {
+                for (let j = 0; j < 15; j++) {
+                    const match = matches[i][j];
+                    const stratA = strategies[i];
+                    const stratB = strategies[j];
 
-        // --- UI HANDLERS ---
+                    const moveA = stratA.func(match.historyA, match.historyB, match.scoreA, match.scoreB);
+                    const moveB = stratB.func(match.historyB, match.historyA, match.scoreB, match.scoreA);
 
-        function handleInput(char) {
-            // If this is the first character of a new message, capture the settings BEFORE they change
-            if (!isTypingMessage) {
-                startSettingsSnapshot = captureSettings();
-                isTypingMessage = true;
+                    match.historyA.push(moveA);
+                    match.historyB.push(moveB);
+
+                    let payoffA = 0;
+                    let payoffB = 0;
+
+                    if (moveA === COOP && moveB === COOP) {
+                        payoffA = R; payoffB = R;
+                    } else if (moveA === DEFECT && moveB === DEFECT) {
+                        payoffA = P; payoffB = P;
+                    } else if (moveA === DEFECT && moveB === COOP) {
+                        payoffA = T; payoffB = S;
+                    } else {
+                        payoffA = S; payoffB = T;
+                    }
+
+                    match.scoreA += payoffA;
+                    match.scoreB += payoffB;
+                }
             }
 
-            const encrypted = encryptChar(char);
-            lightUpLamp(encrypted);
-            appendOutput(encrypted);
-        }
-
-        function lightUpLamp(char) {
-            document.querySelectorAll('.lamp').forEach(l => l.classList.remove('active'));
-            const lamp = document.getElementById(`lamp-${char}`);
-            if (lamp) {
-                lamp.classList.add('active');
-                setTimeout(() => lamp.classList.remove('active'), 800);
+            // Update Totals
+            totalScores.fill(0);
+            for(let i=0; i<15; i++) {
+                for(let j=0; j<15; j++) {
+                    totalScores[i] += matches[i][j].scoreA;
+                }
             }
-        }
 
-        function appendOutput(char) {
-            const outDiv = document.getElementById('output-text');
-            if (outputString === "") outDiv.innerHTML = "";
-            outputString += char;
-            let formatted = outputString.replace(/(.{4})/g, '$1 ').trim();
-            outDiv.textContent = formatted;
-            outDiv.scrollTop = outDiv.scrollHeight;
-        }
-
-        function adjustRotor(index, delta) {
-            const rotor = currentRotors[index];
-            rotor.pos = mod(rotor.pos + delta, 26);
+            currentRound++;
             updateUI();
-            
-            // If user adjusts rotors manually, we are no longer in the middle of a valid message sequence
-            // Reset the "isTyping" state so next keypress is treated as a new start point
-            if (isTypingMessage && outputString.length > 0) {
-                 // Optional: Could warn user they broke the sequence
+        }
+
+        // --- Interaction Functions ---
+
+        function stepGame() {
+            // If playing, pause first
+            if (isPlaying) {
+                stopGame();
+                updatePlayButton();
             }
-            // Ideally, changing settings mid-typing invalidates the "Start Settings" for the whole string.
-            // We'll just reset the typing flag effectively starting a "new" segment, 
-            // but usually users set settings -> type.
-             isTypingMessage = false;
+            // Advance one
+            playRound();
+        }
+
+        function selectMatch(i, j) {
+            // Deselect old
+            if (selectedMatch.row !== null) {
+                const old = document.getElementById(`cell-${selectedMatch.row}-${selectedMatch.col}`);
+                if (old) old.classList.remove('selected-cell');
+            }
+            
+            selectedMatch = { row: i, col: j };
+            
+            const cell = document.getElementById(`cell-${i}-${j}`);
+            if (cell) cell.classList.add('selected-cell');
+
+            renderMatchDetails();
+        }
+
+        function showStrategyInfo(index) {
+            const s = strategies[index];
+            document.getElementById('modal-title').innerText = s.name;
+            document.getElementById('modal-desc').innerText = s.desc;
+            
+            const modal = document.getElementById('strategy-modal');
+            const content = document.getElementById('modal-content');
+            
+            modal.classList.remove('hidden');
+            // Small timeout for animation
+            setTimeout(() => {
+                content.classList.remove('scale-95', 'opacity-0');
+                content.classList.add('scale-100', 'opacity-100');
+            }, 10);
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('strategy-modal');
+            const content = document.getElementById('modal-content');
+            
+            content.classList.remove('scale-100', 'opacity-100');
+            content.classList.add('scale-95', 'opacity-0');
+            
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 200);
+        }
+
+        // --- UI Rendering ---
+
+        function renderGridStructure() {
+            const grid = document.getElementById('grid-container');
+            const topLabels = document.getElementById('top-labels');
+            const leftLabels = document.getElementById('left-labels');
+            
+            grid.innerHTML = '';
+            topLabels.innerHTML = '';
+            leftLabels.innerHTML = '';
+            
+            // Labels
+            strategies.forEach((s, idx) => {
+                const tl = document.createElement('div');
+                tl.className = 'w-full text-center text-[12px] text-gray-500 font-mono origin-bottom-left transform  cursor-pointer hover:font-bold hover:text-indigo-600 transition-colors';
+                tl.innerText = (idx+1); 
+                tl.title = `Click for info: ${s.name}`;
+                tl.onclick = () => showStrategyInfo(idx);
+                topLabels.appendChild(tl);
+
+                const ll = document.createElement('div');
+                ll.className = 'text-[10px] text-gray-600 font-medium truncate h-[2.3rem] leading-[2.3rem] cursor-pointer hover:text-indigo-600 hover:font-bold transition-colors';
+                ll.innerText = s.name;
+                ll.onclick = () => showStrategyInfo(idx);
+                leftLabels.appendChild(ll);
+            });
+
+            // Grid Cells
+            grid.style.gridTemplateColumns = 'repeat(15, minmax(0, 1fr))';
+            
+            for (let i = 0; i < 15; i++) {
+                for (let j = 0; j < 15; j++) {
+                    const cell = document.createElement('div');
+                    cell.id = `cell-${i}-${j}`;
+                    cell.className = 'grid-cell w-full h-full rounded-sm bg-gray-200 relative cursor-pointer border border-white/50 hover:brightness-95';
+                    cell.onclick = () => selectMatch(i, j);
+                    grid.appendChild(cell);
+                }
+            }
+        }
+
+        function renderMatchDetails() {
+            const { row, col } = selectedMatch;
+            const placeholder = document.getElementById('detail-content-placeholder');
+            const content = document.getElementById('detail-content');
+            const coords = document.getElementById('detail-coordinates');
+
+            if (row === null || col === null) {
+                placeholder.classList.remove('hidden');
+                content.classList.add('hidden');
+                coords.innerText = "Select a cell";
+                return;
+            }
+
+            placeholder.classList.add('hidden');
+            content.classList.remove('hidden');
+            content.classList.add('flex');
+
+            const sA = strategies[row];
+            const sB = strategies[col];
+            const match = matches[row][col];
+
+            coords.innerText = `Grid [${row+1}, ${col+1}]`;
+            
+            document.getElementById('p1-name').innerText = sA.name;
+            document.getElementById('p2-name').innerText = sB.name;
+            document.getElementById('p1-score').innerText = match.scoreA;
+            document.getElementById('p2-score').innerText = match.scoreB;
+            document.getElementById('detail-round-count').innerText = `Round ${currentRound}`;
+
+            // Render Timeline
+            const timeline = document.getElementById('timeline-container');
+            timeline.innerHTML = '';
+
+            // If no moves yet
+            if (match.historyA.length === 0) {
+                timeline.innerHTML = '<div class="w-full text-center text-gray-400 text-xs py-4">Waiting for start...</div>';
+                return;
+            }
+
+            // Generate Columns
+            for(let r=0; r<match.historyA.length; r++) {
+                const mA = match.historyA[r];
+                const mB = match.historyB[r];
+                
+                // Calc points for this specific round
+                let pA = 0, pB = 0;
+                if (mA === COOP && mB === COOP) { pA=3; pB=3; }
+                else if (mA === DEFECT && mB === DEFECT) { pA=1; pB=1; }
+                else if (mA === DEFECT && mB === COOP) { pA=5; pB=0; }
+                else { pA=0; pB=5; }
+
+                const colDiv = document.createElement('div');
+                colDiv.className = 'flex flex-col gap-1 items-center min-w-[24px]';
+
+                // Round Number (every 5)
+                const num = document.createElement('div');
+                num.className = 'text-[9px] text-gray-300 h-3 leading-3';
+                num.innerText = (r+1) % 5 === 0 ? (r+1) : '';
+                colDiv.appendChild(num);
+
+                // Player A Move
+                const boxA = document.createElement('div');
+                boxA.className = `w-6 h-6 rounded flex items-center justify-center text-[10px] font-bold text-white shadow-sm ${mA===COOP ? 'bg-green-500' : 'bg-red-500'}`;
+                boxA.innerText = pA;
+                colDiv.appendChild(boxA);
+
+                // Connector line
+                const line = document.createElement('div');
+                line.className = 'w-[1px] h-2 bg-gray-200';
+                colDiv.appendChild(line);
+
+                // Player B Move
+                const boxB = document.createElement('div');
+                boxB.className = `w-6 h-6 rounded flex items-center justify-center text-[10px] font-bold text-white shadow-sm ${mB===COOP ? 'bg-green-500' : 'bg-red-500'}`;
+                boxB.innerText = pB;
+                colDiv.appendChild(boxB);
+
+                timeline.appendChild(colDiv);
+            }
+
+            // Auto scroll to end
+            const scrollContainer = document.querySelector('.timeline-scroll');
+            scrollContainer.scrollLeft = scrollContainer.scrollWidth;
         }
 
         function updateUI() {
-            for(let i=0; i<3; i++) {
-                document.getElementById(`rotor-disp-${i}`).textContent = indexToChar(currentRotors[i].pos);
+            document.getElementById('round-display').innerText = `${currentRound}/${MAX_ROUNDS}`;
+
+            // Update Grid Colors
+            for (let i = 0; i < 15; i++) {
+                for (let j = 0; j < 15; j++) {
+                    const cell = document.getElementById(`cell-${i}-${j}`);
+                    const match = matches[i][j];
+                    
+                    if (match.historyA.length === 0) continue;
+
+                    const lastA = match.historyA[match.historyA.length - 1];
+                    const lastB = match.historyB[match.historyB.length - 1];
+
+                    let colorClass = 'bg-gray-200';
+                    if (lastA === COOP && lastB === COOP) colorClass = 'bg-green-500';
+                    else if (lastA === DEFECT && lastB === DEFECT) colorClass = 'bg-red-500';
+                    else if (lastA === DEFECT && lastB === COOP) colorClass = 'bg-yellow-400'; 
+                    else if (lastA === COOP && lastB === DEFECT) colorClass = 'bg-blue-500'; 
+
+                    // Keep selected class if selected
+                    const isSelected = (selectedMatch.row === i && selectedMatch.col === j);
+                    cell.className = `grid-cell w-full h-full rounded-sm relative cursor-pointer border border-white/50 hover:brightness-95 ${colorClass} ${isSelected ? 'selected-cell' : ''}`;
+                }
+            }
+
+            updateLeaderboard();
+            
+            // Refresh detail view if something is selected
+            if (selectedMatch.row !== null) {
+                renderMatchDetails();
             }
         }
-        
-        function bindSettingsListeners() {
-            [0,1,2].forEach(i => {
-                document.getElementById(`rotor-type-${i}`).addEventListener('change', (e) => {
-                    currentRotors[i].type = e.target.value;
-                    isTypingMessage = false; // Config changed
-                });
+
+        function updateLeaderboard() {
+            const board = document.getElementById('leaderboard');
+            
+            const sortedIndices = totalScores.map((score, index) => ({ score, index }))
+                                            .sort((a, b) => b.score - a.score);
+            
+            board.innerHTML = '';
+            
+            sortedIndices.forEach((item, rank) => {
+                const s = strategies[item.index];
+                const row = document.createElement('div');
+                row.className = 'flex items-center justify-between p-3 mb-2 rounded bg-gray-50 border-l-4 cursor-pointer hover:bg-gray-100 transition-colors ' + s.color;
+                row.onclick = () => showStrategyInfo(item.index);
                 
-                document.getElementById(`ring-setting-${i}`).addEventListener('change', (e) => {
-                    let val = parseInt(e.target.value);
-                    if (val < 1) val = 1; 
-                    if (val > 26) val = 26;
-                    currentRotors[i].ring = val - 1;
-                    isTypingMessage = false; // Config changed
-                });
+                let rankClass = "bg-gray-200 text-gray-600";
+                if(rank===0) rankClass = "bg-yellow-100 text-yellow-700 font-bold";
+                if(rank===1) rankClass = "bg-gray-200 text-gray-700 font-bold";
+                if(rank===2) rankClass = "bg-orange-100 text-orange-800 font-bold";
+
+                row.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <span class="w-6 h-6 flex items-center justify-center rounded-full text-xs ${rankClass}">${rank+1}</span>
+                        <span class="font-medium text-gray-700 text-sm">${s.name}</span>
+                    </div>
+                    <span class="font-mono font-bold text-indigo-600">${item.score}</span>
+                `;
+                board.appendChild(row);
             });
         }
 
-        function validatePlugboard(input) {
-            const val = input.value.toUpperCase().replace(/[^A-Z ]/g, '');
-            input.value = val;
-            
-            const pairs = val.trim().split(/\s+/);
-            const errorDiv = document.getElementById('plugboard-error');
-            const usedChars = new Set();
-            
-            plugboard.clear();
-            let hasError = false;
-
-            pairs.forEach(pair => {
-                if (pair.length === 0) return;
-                if (pair.length !== 2) {
-                    if (pair.length === 1 && pairs.indexOf(pair) === pairs.length -1) {
-                        // Typing last char, ignore
-                    } else {
-                        hasError = true;
-                        errorDiv.textContent = "Incomplete: " + pair;
-                    }
-                    return;
-                }
-                
-                const a = pair[0];
-                const b = pair[1];
-
-                if (usedChars.has(a) || usedChars.has(b)) {
-                    hasError = true;
-                    errorDiv.textContent = "Duplicate: " + (usedChars.has(a) ? a : b);
-                    return;
-                }
-                
-                if (a === b) {
-                    hasError = true;
-                    errorDiv.textContent = "Self-plug: " + a;
-                    return;
-                }
-
-                usedChars.add(a);
-                usedChars.add(b);
-                plugboard.set(a, b);
-                plugboard.set(b, a);
-            });
-
-            if (!hasError) errorDiv.textContent = "";
-            isTypingMessage = false; // Config changed
+        function updatePlayButton() {
+            const btn = document.getElementById('play-btn');
+            if (isPlaying) {
+                btn.innerHTML = `<span>⏸</span> Pause`;
+                btn.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
+                btn.classList.add('bg-red-600', 'hover:bg-red-700');
+            } else {
+                btn.innerHTML = `<span id="play-icon">▶</span> Auto-Play`;
+                btn.classList.remove('bg-red-600', 'hover:bg-red-700');
+                btn.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
+            }
         }
 
-        function resetMachine() {
-            currentRotors.forEach(r => r.pos = 0);
-            updateUI();
-            isTypingMessage = false;
+        function togglePlay() {
+            if (isPlaying) {
+                stopGame();
+            } else {
+                if (currentRound >= MAX_ROUNDS) resetGame();
+                isPlaying = true;
+                intervalId = setInterval(playRound, speed);
+            }
+            updatePlayButton();
         }
 
-        function clearText() {
-            outputString = "";
-            document.getElementById('output-text').innerHTML = '<span class="text-neutral-600 italic text-sm">// Encrypted output...</span>';
-            isTypingMessage = false;
+        function stopGame() {
+            isPlaying = false;
+            if (intervalId) clearInterval(intervalId);
+            updatePlayButton();
         }
 
-        // --- START ---
-        bindSettingsListeners();
-        [0,1,2].forEach(i => {
-            currentRotors[i].ring = parseInt(document.getElementById(`ring-setting-${i}`).value) - 1;
-            currentRotors[i].type = document.getElementById(`rotor-type-${i}`).value;
-        });
-        init();
+        function resetGame() {
+            stopGame();
+            currentRound = 0;
+            // Clear selection on reset? No, keep it, just clear data.
+            initTournament();
+            // Force redraw of empty details
+            renderMatchDetails();
+        }
+
+        // Init
+        initTournament();
 
     </script>
 </body>

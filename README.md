@@ -1,47 +1,61 @@
-# Enigma Machine Simulator
+# Axelrod's Prisoner's Dilemma Tournament
 
-A fully functional, web-based simulator of the famous **Enigma I** machine used by the Wehrmacht during World War II. This project provides an interactive and historically accurate experience of encryption and decryption using the Enigma mechanism.
+A comprehensive web-based simulation of Robert Axelrod's famous Prisoner's Dilemma tournament, exploring the evolution of cooperation through game theory.
 
-## 🌟 Features
+## 📚 Research Foundation
 
-*   **Accurate Simulation**: Replicates the internal wiring and mechanics of the Enigma I (Reflector B).
-*   **Rotor System**:
-    *   Select from Rotors I, II, and III.
-    *   Adjust Ring Settings (Ringstellung).
-    *   Set Initial Rotor Positions (Grundstellung).
-    *   Authentic stepping mechanism (including the "double step" anomaly).
-*   **Plugboard (Steckerbrett)**:
-    *   Connect letter pairs to swap signals before they enter the rotors.
-    *   Real-time validation for duplicates and self-connections.
-*   **Interactive Interface**:
-    *   **Lampboard**: Visual feedback with glowing lamps for encrypted output.
-    *   **Keyboard**: Clickable keys and physical keyboard support.
-    *   **Textures**: Wood and metal textures for a retro feel.
-*   **Message History**:
-    *   Automatically logs encrypted messages.
-    *   Saves the *exact* machine state (Rotor positions, Ring settings, Plugboard) for each message.
-    *   **One-Click Restore**: Click any saved message to instantly restore the machine to that state and decrypt the message.
+This project is based on Robert Axelrod's influential research paper, **"Effective Choice in the Prisoner's Dilemma"**, which made significant contributions to the fields of game theory, political science, and evolutionary biology.
 
-## 🚀 How to Use
+Axelrod's work demonstrated how cooperation can emerge in a competitive environment of self-interested agents without a central authority. His tournament invited experts to submit computer programs (strategies) to play the Iterated Prisoner's Dilemma against each other. The surprising winner was the simplest strategy: **Tit for Tat**.
 
-1.  **Open the Simulator**: Simply open `index.html` in any modern web browser. No installation required.
-2.  **Configure the Machine**:
-    *   **Rotors**: Choose your rotors (Left, Middle, Right) and set their Ring settings (1-26) and starting positions (A-Z).
-    *   **Plugboard**: Enter pairs of letters to swap (e.g., `AB CD XY`).
-3.  **Encrypt/Decrypt**:
-    *   Type your message using your physical keyboard or the on-screen keys.
-    *   The **Lampboard** will light up to show the encrypted character.
-    *   The encrypted text will appear in the output display.
-4.  **Save & Restore**:
-    *   Press `Enter` or click "SAVE & CLEAR" to save your message to the history log.
-    *   Click on any message in the **Message Log** to restore the machine settings used for that message. This allows you to easily decrypt saved messages.
+## 🎮 Simulation Features
 
-## 🛠️ Technical Details
+This application brings Axelrod's tournament to life in your browser:
 
-*   **Tech Stack**: HTML5, CSS3 (Tailwind CSS via CDN), Vanilla JavaScript.
-*   **Single File**: The entire application is contained within `index.html` for easy portability.
-*   **Design**: Responsive design with a dark, tactical aesthetic using `Courier Prime` and `Special Elite` fonts.
+-   **15 Unique Strategies**: Includes classic strategies like *Tit for Tat*, *Friedman (Grudger)*, *Joss*, *Downing*, and more.
+-   **Interactive Tournament Grid**: A 15x15 grid visualizing every match-up between strategies.
+-   **Real-time Analysis**:
+    -   **Match Details**: Click any cell to see a round-by-round timeline of moves (Cooperate vs. Defect).
+    -   **Live Leaderboard**: Watch strategies climb or fall in rank as the tournament progresses.
+    -   **Strategy Logic**: Click on any strategy name to learn how it makes decisions.
+-   **Playback Controls**:
+    -   **Auto-Play**: Watch the full 200-round tournament unfold automatically.
+    -   **Step-by-Step**: Analyze the game one round at a time.
+    -   **Speed Control**: (Internal variable) Adjustable simulation speed.
 
-## 📜 License
+## 🧠 The Strategies
 
-This project is open-source and available for educational and personal use.
+The simulation includes approximations of the following strategies:
+
+1.  **Tit For Tat**: Cooperates on the first move, then copies the opponent's last move.
+2.  **Tideman & Chieruzzi**: A complex strategy that retaliates but tries to break defect cycles.
+3.  **Nydegger**: Uses a weighted formula of the last 3 outcomes.
+4.  **Grofman**: Cooperates if moves match; otherwise, cooperates with a probability of 2/7.
+5.  **Shubik**: Retaliates with increasing severity based on the number of times betrayed.
+6.  **Stein & Rapoport**: Tit for Tat modification; cooperates first 4, defects last 2.
+7.  **Friedman (Grudger)**: Cooperates until betrayed once, then defects forever.
+8.  **Davis**: Cooperates for 10 rounds, then becomes a Grudger if betrayed.
+9.  **Graaskamp**: Tit for Tat variant that defects on round 51 and periodically checks for weakness.
+10. **Downing**: Estimates opponent's response probabilities to maximize expected yield.
+11. **Feld**: Tit for Tat with a linearly decreasing probability of cooperation.
+12. **Joss**: Tit for Tat but defects 10% of the time to try and exploit others.
+13. **Tullock**: Cooperates based on the opponent's cooperation rate minus 10%.
+14. **Name Withheld**: Tries to align behavior if the opponent is cooperative (>70%).
+15. **Random**: The control strategy; 50/50 chance to Cooperate or Defect.
+
+## 🚀 Getting Started
+
+1.  Clone the repository.
+2.  Open `index.html` in any modern web browser.
+3.  Click **Auto-Play** to start the tournament or use **Step +1** to move manually.
+
+## 🛠 Technologies Used
+
+-   **HTML5**
+-   **JavaScript (ES6+)**
+-   **Tailwind CSS** (via CDN) for styling
+-   **Chart.js** (via CDN)
+
+## ⚠️ Disclaimer
+
+The strategies implemented here are approximations based on descriptions from Robert Axelrod's *"The Evolution of Cooperation"*. As the original 1980 source code is not publicly available, specific implementation details (like exact random seeds, tie-breaking logic, or complex look-back depths) may differ slightly from the original tournament.
